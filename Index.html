@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Las Aventuras de los Tres</title>
+  <!-- Manifest para PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <!-- Tailwind CSS desde CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Fuente personalizada y estilos de animación -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Kids+Play&display=swap');
+    body { font-family: 'Kids Play', cursive; }
+    .flip-enter { transform: rotateY(-90deg); }
+    .flip-enter-active { transform: rotateY(0deg); transition: transform 0.6s ease; }
+    .flip-exit { transform: rotateY(0deg); }
+    .flip-exit-active { transform: rotateY(90deg); transition: transform 0.6s ease; }
+  </style>
+</head>
+<body class="bg-yellow-50 flex items-center justify-center min-h-screen">
+  <div id="app" class="w-full max-w-3xl bg-white shadow-xl rounded-2xl overflow-hidden relative" role="region" aria-label="Cuento interactivo">
+    <img id="imagen" class="w-full object-cover" alt="Ilustración de página" loading="lazy" />
+    <div id="texto" class="p-6 text-lg leading-relaxed" tabindex="0"></div>
+    <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
+      <span id="progreso" class="text-sm"></span>
+    </div>
+    <button id="prev" class="absolute left-4 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-green-300" aria-label="Página anterior">◀</button>
+    <button id="next" class="absolute right-4 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-blue-300" aria-label="Página siguiente">▶</button>
+  </div>
+
+  <!-- Hammer.js para gestos táctiles -->
+  <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
+  <script>
+    let paginas = [];
+    let idx = 0;
+    const imgEl = document.getElementById('imagen');
+    const textoEl = document.getElementById('texto');
+    const progresoEl = document.getElementById('progreso');
+    const prevBtn = document.getElementById('prev');
+    const nextBtn = document.getElementById('next');
+
+    // Función para actualizar controles y progreso
+    function actualizarControles() {
+      prevBtn.disabled = idx === 0;
+      nextBtn.disabled = idx === paginas.length - 1;
+      progresoEl.textContent = `Página ${idx+1} de ${paginas.length}`;
+    }
+
+    // Función para mostrar una página
+    function mostrarPagina(i) {
+      idx = i;
+      imgEl.classList.add('flip-enter');
+      setTimeout(() => imgEl.classList.replace('flip-enter', 'flip-enter-active'), 0);
+      imgEl.src = `images/${i+1}.jpeg`;
+      imgEl.onload = () => imgEl.classList.remove('flip-enter-active');
+
+      textoEl.textContent = paginas[i];
+      textoEl.focus();
+      actualizarControles();
+      localStorage.setItem('ultimaPagina', idx);
+
+      // Preload siguiente y anterior
+      [i+1, i-1].forEach(j => {
+        if (j >= 0 && j < paginas.length) {
+          const img = new Image();
+          img.src = `images/${j+1}.jpeg`;
+        }
+      });
+    }
+
+    // Carga JSON de páginas y arranca la primera
+    fetch('texto/paginas.json')
+      .then(resp => resp.json())
+      .then(data => {
+        paginas = data;
+        idx = parseInt(localStorage.getItem('ultimaPagina')) || 0;
+        mostrarPagina(idx);
+      })
+      .catch(() => {
+        textoEl.textContent = 'Error al cargar el cuento.';
+      });
+
+    // Eventos de botones
+    prevBtn.addEventListener('click', () => { if (idx > 0) mostrarPagina(idx - 1); });
+    nextBtn.addEventListener('click', () => { if (idx < paginas.length - 1) mostrarPagina(idx + 1); });
+
+    // Navegación por teclado
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight') nextBtn.click();
+      if (e.key === 'ArrowLeft') prevBtn.click();
+    });
+
+    // Gestos táctiles swipe
+    const hammer = new Hammer(document.getElementById('app'));
+    hammer.on('swipeleft', () => nextBtn.click());
+    hammer.on('swiperight', () => prevBtn.click());
+  </script>
+
+  <!-- Service Worker para PWA -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
+</body>
+</html>
