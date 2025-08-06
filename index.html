@@ -40,19 +40,17 @@
     const prevBtn = document.getElementById('prev');
     const nextBtn = document.getElementById('next');
 
-    // Función para actualizar controles y progreso
     function actualizarControles() {
       prevBtn.disabled = idx === 0;
       nextBtn.disabled = idx === paginas.length - 1;
       progresoEl.textContent = `Página ${idx+1} de ${paginas.length}`;
     }
 
-    // Función para mostrar una página
     function mostrarPagina(i) {
       idx = i;
       imgEl.classList.add('flip-enter');
       setTimeout(() => imgEl.classList.replace('flip-enter', 'flip-enter-active'), 0);
-      imgEl.src = `images/${i+1}.jpeg`;
+      imgEl.src = `images/${i+1}.png`;
       imgEl.onload = () => imgEl.classList.remove('flip-enter-active');
 
       textoEl.textContent = paginas[i];
@@ -60,16 +58,13 @@
       actualizarControles();
       localStorage.setItem('ultimaPagina', idx);
 
-      // Preload siguiente y anterior
       [i+1, i-1].forEach(j => {
         if (j >= 0 && j < paginas.length) {
-          const img = new Image();
-          img.src = `images/${j+1}.jpeg`;
+          const img = new Image(); img.src = `images/${j+1}.png`;
         }
       });
     }
 
-    // Carga JSON de páginas y arranca la primera
     fetch('texto/paginas.json')
       .then(resp => resp.json())
       .then(data => {
@@ -81,17 +76,14 @@
         textoEl.textContent = 'Error al cargar el cuento.';
       });
 
-    // Eventos de botones
     prevBtn.addEventListener('click', () => { if (idx > 0) mostrarPagina(idx - 1); });
     nextBtn.addEventListener('click', () => { if (idx < paginas.length - 1) mostrarPagina(idx + 1); });
 
-    // Navegación por teclado
     document.addEventListener('keydown', e => {
       if (e.key === 'ArrowRight') nextBtn.click();
       if (e.key === 'ArrowLeft') prevBtn.click();
     });
 
-    // Gestos táctiles swipe
     const hammer = new Hammer(document.getElementById('app'));
     hammer.on('swipeleft', () => nextBtn.click());
     hammer.on('swiperight', () => prevBtn.click());
