@@ -2,143 +2,104 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Las aventuras de los tres</title>
-  <!-- == TU CSS ORIGINAL == -->
-  <link rel="stylesheet" href="css/reset.css" />
-  <link rel="stylesheet" href="css/style.css" />
-  <!-- Estilos adicionales para el visor y controles -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Las Aventuras de los Tres</title>
+  <!-- Manifest para PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <!-- Tailwind CSS desde CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Fuente personalizada y estilos de animación -->
   <style>
-    body {
-      margin: 0;
-      background: #222;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-      color: #fff;
-      font-family: sans-serif;
-    }
-    h1 {
-      margin: 20px 0 0;
-    }
-    #viewer {
-      position: relative;
-      width: 80vw;
-      max-width: 800px;
-      height: auto;
-      background: #000;
-      overflow: hidden;
-    }
-    #viewer img {
-      width: 100%;
-      height: auto;
-      display: none;
-    }
-    #viewer img.active {
-      display: block;
-    }
-    #page-text {
-      padding: 15px;
-      background: #111;
-      line-height: 1.4;
-      font-size: 1rem;
-      max-width: 800px;
-    }
-    #controls {
-      margin: 15px 0;
-    }
-    #controls button {
-      background: rgba(255,255,255,0.2);
-      border: none;
-      color: #fff;
-      font-size: 2rem;
-      width: 3rem;
-      height: 3rem;
-      margin: 0 1rem;
-      cursor: pointer;
-      border-radius: 4px;
-      line-height: 1;
-    }
-    #controls button:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Kids+Play&display=swap');
+    body { font-family: 'Kids Play', cursive; }
+    .flip-enter { transform: rotateY(-90deg); }
+    .flip-enter-active { transform: rotateY(0deg); transition: transform 0.6s ease; }
+    .flip-exit { transform: rotateY(0deg); }
+    .flip-exit-active { transform: rotateY(90deg); transition: transform 0.6s ease; }
   </style>
 </head>
-<body>
-  <h1>Mi Cuento de Aventuras</h1>
+<body class="bg-yellow-50 flex items-center justify-center min-h-screen p-4">
+  <div id="app" class="w-full max-w-3xl bg-white shadow-xl rounded-2xl overflow-hidden relative">
+    <img id="imagen" class="w-full object-cover mb-6" alt="Ilustración de página" loading="lazy" />
+    <div id="texto" class="px-8 py-6 text-lg leading-relaxed" tabindex="0"></div>
 
-  <div id="viewer">
-    <!-- Imágenes: 1.png … 18.png -->
-    <img id="page1"  src="images/1.png"  alt="Página 1" />
-    <img id="page2"  src="images/2.png"  alt="Página 2" />
-    <img id="page3"  src="images/3.png"  alt="Página 3" />
-    <!-- ... hasta page18 -->
-    <img id="page18" src="images/18.png" alt="Página 18" />
+    <!-- Controles de navegación -->
+    <button id="prev"
+            class="absolute left-4 top-1/2 transform -translate-y-1/2 p-3 rounded-full bg-green-400"
+            aria-label="Página anterior">◀</button>
+    <button id="next"
+            class="absolute right-4 top-1/2 transform -translate-y-1/2 p-3 rounded-full bg-blue-400"
+            aria-label="Página siguiente">▶</button>
   </div>
 
-  <!-- Aquí se inyecta el texto de cada página -->
-  <div id="page-text"></div>
-
-  <div id="controls">
-    <button id="prev" aria-label="Anterior">‹</button>
-    <button id="next" aria-label="Siguiente">›</button>
-  </div>
-
+  <!-- Hammer.js para gestos táctiles -->
+  <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
   <script>
-    // Texto de cada página (1 a 18)
-    const pageTexts = [
-      `En un claro al amanecer, Simón movía piedras con la mente mientras Alba volaba y jugaba con el agua, y Olivia corría como un torbellino. Así entrenaban sus increíbles poderes.`,
-      `Mientras desayunaban, vieron en el periódico un gran titular: “¡Joya sagrada robada en África!”. Sus ojos se abrieron de asombro y decidieron ayudar.`,
-      `Con mochilas al hombro, subieron al avión rumbo a África. Miraban por la ventanilla el cielo azul, emocionados por la aventura.`,
-      `Al bajar, caminaron por la selva y tropezaron con un agujero cubierto de ramas y hojas secas. ¡Era la primera trampa de Filo!`,
-      `Olivia corrió con su supervelocidad y arrancó el camuflaje, apartando las ramas con su superfuerza para liberar el pozo.`,
-      `Más adelante encontraron un río caudaloso. El agua rugía y parecía imposible cruzarlo, así que se pararon a pensar.`,
-      `Simón levantó una mano y concentró su telequinesis en las rocas del cauce. El agua golpeaba, pero él luchaba por moverlas.`,
-      `De pronto, las piedras flotaron formando un puente sobre el río. Simón puso el pie en ellas; detrás, Alba y Olivia cruzaron aliviadas.`,
-      `Frente a un baobab milenario, hallaron un muro de enredaderas vivas que bloqueaba el paso. Sus rostros reflejaban cautela y curiosidad.`,
-      `Alba puso una mano en las raíces, hablando con las plantas. Susurró con cariño, aunque una punta de temor brillaba en su mirada.`,
-      `Con un gesto, Alba congeló las raíces y abrió un hueco helado en el muro. Sonrió, orgullosa, mientras sus amigos cruzaban.`,
-      `Al fin llegaron a un campamento abandonado: cenizas en el suelo, un sombrero tirado y huellas frescas. Simón señaló el sombrero con gesto serio.`,
-      `De la oscuridad emergió Filo, con túnica oscura y ceño malvado. Lanzó un rayo de energía que se cruzó con los ataques de los tres.`,
-      `Unieron sus fuerzas: agua de Alba, viento telequinético de Simón y la velocidad de Olivia formaron un contraataque brillante.`,
-      `Olivia embistió con fuerza, Simón creó una estaca de roca y Alba la congeló: su ataque combinado derribó a Filo de una vez por todas.`,
-      `En el altar sagrado, colocaron la joya con respeto. Las antorchas iluminaban las columnas talladas, y los ancianos cantaban al fondo.`,
-      `Como gratitud, el anciano les entregó obsequios: a Simón un brazalete dorado, a Alba un collar de corales y a Olivia unas sandalias azules.`,
-      `En el avión de regreso, al atardecer, miraron Hoyo de Manzanares por la ventanilla. Sonrieron, satisfechos de su gran aventura.`
-    ];
+    let paginas = [];
+    let idx = 0; // siempre comienza en página 0
 
-    const total = pageTexts.length;
-    const pages = Array.from({ length: total }, (_, i) => `page${i+1}`);
-    let currentIndex = 0;
-
+    const imgEl   = document.getElementById('imagen');
+    const textoEl = document.getElementById('texto');
     const prevBtn = document.getElementById('prev');
     const nextBtn = document.getElementById('next');
-    const pageTextDiv = document.getElementById('page-text');
 
-    function showPage(idx) {
-      pages.forEach((id, i) => {
-        document.getElementById(id)
-          .classList.toggle('active', i === idx);
-      });
-      // Actualiza texto
-      pageTextDiv.textContent = pageTexts[idx];
-      // Botones habilitados/deshabilitados
+    function actualizarControles() {
       prevBtn.disabled = idx === 0;
-      nextBtn.disabled = idx === total - 1;
+      nextBtn.disabled = idx === paginas.length - 1;
     }
 
+    function mostrarPagina(i) {
+      idx = i;
+      imgEl.classList.add('flip-enter');
+      setTimeout(() => imgEl.classList.replace('flip-enter', 'flip-enter-active'), 0);
+      imgEl.src = `images/${i+1}.png`;
+      imgEl.onload = () => imgEl.classList.remove('flip-enter-active');
+
+      textoEl.textContent = paginas[i];
+      textoEl.focus();
+      actualizarControles();
+
+      // pre-carga de la siguiente/anterior
+      [i+1, i-1].forEach(j => {
+        if (j >= 0 && j < paginas.length) {
+          const img = new Image();
+          img.src = `images/${j+1}.png`;
+        }
+      });
+    }
+
+    fetch('texto/paginas.json')
+      .then(resp => resp.json())
+      .then(data => {
+        paginas = data;
+        mostrarPagina(0); // siempre arranca en la página 1
+      })
+      .catch(() => {
+        textoEl.textContent = 'Error al cargar el cuento.';
+      });
+
     prevBtn.addEventListener('click', () => {
-      if (currentIndex > 0) showPage(--currentIndex);
+      if (idx > 0) mostrarPagina(idx - 1);
     });
     nextBtn.addEventListener('click', () => {
-      if (currentIndex < total - 1) showPage(++currentIndex);
+      if (idx < paginas.length - 1) mostrarPagina(idx + 1);
     });
 
-    window.addEventListener('DOMContentLoaded', () => {
-      currentIndex = 0;
-      showPage(currentIndex);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight') nextBtn.click();
+      if (e.key === 'ArrowLeft')  prevBtn.click();
     });
+
+    const hammer = new Hammer(document.getElementById('app'));
+    hammer.on('swipeleft', () => nextBtn.click());
+    hammer.on('swiperight', () => prevBtn.click());
+  </script>
+
+  <!-- Service Worker para PWA -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
   </script>
 </body>
 </html>
