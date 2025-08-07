@@ -3,13 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <title>Mi Cuento de Aventuras</title>
-  <!-- == AQUÍ ESTÁ TU CSS ORIGINAL: NO LO ELIMINES == -->
+  <!-- == TU CSS ORIGINAL == -->
   <link rel="stylesheet" href="css/reset.css" />
   <link rel="stylesheet" href="css/style.css" />
-  <!-- cualquier otro <meta>, fuentes, etc que tenías -->
+  <!-- Estilos adicionales para el visor y controles -->
   <style>
-    /* Si había estilos inline específicos, añádelos aquí */
-    /* Por ejemplo, para centrar el visor: */
     body {
       margin: 0;
       background: #222;
@@ -20,24 +18,31 @@
       color: #fff;
       font-family: sans-serif;
     }
+    h1 {
+      margin: 20px 0 0;
+    }
     #viewer {
       position: relative;
       width: 80vw;
       max-width: 800px;
-      height: 60vh;
-      max-height: 600px;
+      height: auto;
       background: #000;
       overflow: hidden;
-      margin-top: 20px;
     }
     #viewer img {
       width: 100%;
-      height: 100%;
-      object-fit: contain;
+      height: auto;
       display: none;
     }
     #viewer img.active {
       display: block;
+    }
+    #page-text {
+      padding: 15px;
+      background: #111;
+      line-height: 1.4;
+      font-size: 1rem;
+      max-width: 800px;
     }
     #controls {
       margin: 15px 0;
@@ -64,13 +69,16 @@
   <h1>Mi Cuento de Aventuras</h1>
 
   <div id="viewer">
-    <!-- 18 imágenes, renombradas 1.png, 2.png, … hasta 18.png en carpeta images/ -->
+    <!-- Imágenes: 1.png … 18.png -->
     <img id="page1"  src="images/1.png"  alt="Página 1" />
     <img id="page2"  src="images/2.png"  alt="Página 2" />
     <img id="page3"  src="images/3.png"  alt="Página 3" />
-    <!-- … -->
+    <!-- ... hasta page18 -->
     <img id="page18" src="images/18.png" alt="Página 18" />
   </div>
+
+  <!-- Aquí se inyecta el texto de cada página -->
+  <div id="page-text"></div>
 
   <div id="controls">
     <button id="prev" aria-label="Anterior">‹</button>
@@ -78,37 +86,55 @@
   </div>
 
   <script>
-    // Creamos un array con las IDs: page1, page2, … page18
-    const total = 18;
+    // Texto de cada página (1 a 18)
+    const pageTexts = [
+      `En un claro al amanecer, Simón movía piedras con la mente mientras Alba volaba y jugaba con el agua, y Olivia corría como un torbellino. Así entrenaban sus increíbles poderes.`,
+      `Mientras desayunaban, vieron en el periódico un gran titular: “¡Joya sagrada robada en África!”. Sus ojos se abrieron de asombro y decidieron ayudar.`,
+      `Con mochilas al hombro, subieron al avión rumbo a África. Miraban por la ventanilla el cielo azul, emocionados por la aventura.`,
+      `Al bajar, caminaron por la selva y tropezaron con un agujero cubierto de ramas y hojas secas. ¡Era la primera trampa de Filo!`,
+      `Olivia corrió con su supervelocidad y arrancó el camuflaje, apartando las ramas con su superfuerza para liberar el pozo.`,
+      `Más adelante encontraron un río caudaloso. El agua rugía y parecía imposible cruzarlo, así que se pararon a pensar.`,
+      `Simón levantó una mano y concentró su telequinesis en las rocas del cauce. El agua golpeaba, pero él luchaba por moverlas.`,
+      `De pronto, las piedras flotaron formando un puente sobre el río. Simón puso el pie en ellas; detrás, Alba y Olivia cruzaron aliviadas.`,
+      `Frente a un baobab milenario, hallaron un muro de enredaderas vivas que bloqueaba el paso. Sus rostros reflejaban cautela y curiosidad.`,
+      `Alba puso una mano en las raíces, hablando con las plantas. Susurró con cariño, aunque una punta de temor brillaba en su mirada.`,
+      `Con un gesto, Alba congeló las raíces y abrió un hueco helado en el muro. Sonrió, orgullosa, mientras sus amigos cruzaban.`,
+      `Al fin llegaron a un campamento abandonado: cenizas en el suelo, un sombrero tirado y huellas frescas. Simón señaló el sombrero con gesto serio.`,
+      `De la oscuridad emergió Filo, con túnica oscura y ceño malvado. Lanzó un rayo de energía que se cruzó con los ataques de los tres.`,
+      `Unieron sus fuerzas: agua de Alba, viento telequinético de Simón y la velocidad de Olivia formaron un contraataque brillante.`,
+      `Olivia embistió con fuerza, Simón creó una estaca de roca y Alba la congeló: su ataque combinado derribó a Filo de una vez por todas.`,
+      `En el altar sagrado, colocaron la joya con respeto. Las antorchas iluminaban las columnas talladas, y los ancianos cantaban al fondo.`,
+      `Como gratitud, el anciano les entregó obsequios: a Simón un brazalete dorado, a Alba un collar de corales y a Olivia unas sandalias azules.`,
+      `En el avión de regreso, al atardecer, miraron Hoyo de Manzanares por la ventanilla. Sonrieron, satisfechos de su gran aventura.`
+    ];
+
+    const total = pageTexts.length;
     const pages = Array.from({ length: total }, (_, i) => `page${i+1}`);
-    let currentIndex = 0; // siempre arrancamos en la primera página
+    let currentIndex = 0;
 
     const prevBtn = document.getElementById('prev');
     const nextBtn = document.getElementById('next');
+    const pageTextDiv = document.getElementById('page-text');
 
     function showPage(idx) {
       pages.forEach((id, i) => {
-        const img = document.getElementById(id);
-        img.classList.toggle('active', i === idx);
+        document.getElementById(id)
+          .classList.toggle('active', i === idx);
       });
+      // Actualiza texto
+      pageTextDiv.textContent = pageTexts[idx];
+      // Botones habilitados/deshabilitados
       prevBtn.disabled = idx === 0;
       nextBtn.disabled = idx === total - 1;
     }
 
     prevBtn.addEventListener('click', () => {
-      if (currentIndex > 0) {
-        currentIndex--;
-        showPage(currentIndex);
-      }
+      if (currentIndex > 0) showPage(--currentIndex);
     });
     nextBtn.addEventListener('click', () => {
-      if (currentIndex < total - 1) {
-        currentIndex++;
-        showPage(currentIndex);
-      }
+      if (currentIndex < total - 1) showPage(++currentIndex);
     });
 
-    // Al cargar la página forzamos siempre el primer slide
     window.addEventListener('DOMContentLoaded', () => {
       currentIndex = 0;
       showPage(currentIndex);
