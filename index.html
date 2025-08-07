@@ -3,21 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <title>Mi Cuento de Aventuras</title>
+  <!-- == AQUÍ ESTÁ TU CSS ORIGINAL: NO LO ELIMINES == -->
+  <link rel="stylesheet" href="css/reset.css" />
+  <link rel="stylesheet" href="css/style.css" />
+  <!-- cualquier otro <meta>, fuentes, etc que tenías -->
   <style>
+    /* Si había estilos inline específicos, añádelos aquí */
+    /* Por ejemplo, para centrar el visor: */
     body {
       margin: 0;
       background: #222;
       display: flex;
       flex-direction: column;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
       color: #fff;
       font-family: sans-serif;
     }
     #viewer {
       position: relative;
-      width: 800px;
-      height: 600px;
+      width: 80vw;
+      max-width: 800px;
+      height: 60vh;
+      max-height: 600px;
       background: #000;
       overflow: hidden;
       margin-top: 20px;
@@ -32,62 +40,61 @@
       display: block;
     }
     #controls {
-      margin-top: 10px;
+      margin: 15px 0;
     }
     #controls button {
-      background: #444;
+      background: rgba(255,255,255,0.2);
       border: none;
       color: #fff;
-      padding: 10px 20px;
-      font-size: 16px;
-      margin: 0 5px;
+      font-size: 2rem;
+      width: 3rem;
+      height: 3rem;
+      margin: 0 1rem;
       cursor: pointer;
       border-radius: 4px;
+      line-height: 1;
     }
     #controls button:disabled {
-      background: #666;
+      opacity: 0.4;
       cursor: not-allowed;
     }
   </style>
 </head>
 <body>
   <h1>Mi Cuento de Aventuras</h1>
+
   <div id="viewer">
-    <!-- Imágenes de página (.png) -->
-    <img id="page1"  src="images/page1.png"  alt="Página 1" />
-    <img id="page2"  src="images/page2.png"  alt="Página 2" />
-    <img id="page3"  src="images/page3.png"  alt="Página 3" />
-    <!-- … hasta la página 18 -->
-    <img id="page18" src="images/page18.png" alt="Página 18" />
+    <!-- 18 imágenes, renombradas 1.png, 2.png, … hasta 18.png en carpeta images/ -->
+    <img id="page1"  src="images/1.png"  alt="Página 1" />
+    <img id="page2"  src="images/2.png"  alt="Página 2" />
+    <img id="page3"  src="images/3.png"  alt="Página 3" />
+    <!-- … -->
+    <img id="page18" src="images/18.png" alt="Página 18" />
   </div>
 
   <div id="controls">
-    <button id="prev">Anterior</button>
-    <button id="next">Siguiente</button>
+    <button id="prev" aria-label="Anterior">‹</button>
+    <button id="next" aria-label="Siguiente">›</button>
   </div>
 
   <script>
-    // IDs de cada imagen/página
-    const pages = Array.from({ length: 18 }, (_, i) => `page${i+1}`);
-
-    // Siempre empezamos en la primera página (índice 0)
-    let currentIndex = 0;
+    // Creamos un array con las IDs: page1, page2, … page18
+    const total = 18;
+    const pages = Array.from({ length: total }, (_, i) => `page${i+1}`);
+    let currentIndex = 0; // siempre arrancamos en la primera página
 
     const prevBtn = document.getElementById('prev');
     const nextBtn = document.getElementById('next');
 
-    function showPage(index) {
+    function showPage(idx) {
       pages.forEach((id, i) => {
         const img = document.getElementById(id);
-        if (!img) return;
-        img.classList.toggle('active', i === index);
+        img.classList.toggle('active', i === idx);
       });
-      // Desactivar botones en los extremos
-      prevBtn.disabled = index === 0;
-      nextBtn.disabled = index === pages.length - 1;
+      prevBtn.disabled = idx === 0;
+      nextBtn.disabled = idx === total - 1;
     }
 
-    // Event listeners para navegar
     prevBtn.addEventListener('click', () => {
       if (currentIndex > 0) {
         currentIndex--;
@@ -95,13 +102,13 @@
       }
     });
     nextBtn.addEventListener('click', () => {
-      if (currentIndex < pages.length - 1) {
+      if (currentIndex < total - 1) {
         currentIndex++;
         showPage(currentIndex);
       }
     });
 
-    // Al cargar la página, forzamos a mostrar siempre la página 1
+    // Al cargar la página forzamos siempre el primer slide
     window.addEventListener('DOMContentLoaded', () => {
       currentIndex = 0;
       showPage(currentIndex);
