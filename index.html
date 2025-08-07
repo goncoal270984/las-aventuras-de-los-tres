@@ -2,98 +2,110 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Las Aventuras de los Tres</title>
-  <!-- Manifest para PWA -->
-  <link rel="manifest" href="manifest.json" />
-  <!-- Tailwind CSS desde CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Fuente personalizada y estilos de animación -->
+  <title>Mi Cuento de Aventuras</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Kids+Play&display=swap');
-    body { font-family: 'Kids Play', cursive; }
-    .flip-enter { transform: rotateY(-90deg); }
-    .flip-enter-active { transform: rotateY(0deg); transition: transform 0.6s ease; }
-    .flip-exit { transform: rotateY(0deg); }
-    .flip-exit-active { transform: rotateY(90deg); transition: transform 0.6s ease; }
+    body {
+      margin: 0;
+      background: #222;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+      color: #fff;
+      font-family: sans-serif;
+    }
+    #viewer {
+      position: relative;
+      width: 800px;
+      height: 600px;
+      background: #000;
+      overflow: hidden;
+      margin-top: 20px;
+    }
+    #viewer img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: none;
+    }
+    #viewer img.active {
+      display: block;
+    }
+    #controls {
+      margin-top: 10px;
+    }
+    #controls button {
+      background: #444;
+      border: none;
+      color: #fff;
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 0 5px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    #controls button:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
   </style>
 </head>
-<body class="bg-yellow-50 flex items-center justify-center min-h-screen">
-  <div id="app" class="w-full max-w-3xl bg-white shadow-xl rounded-2xl overflow-hidden relative" role="region" aria-label="Cuento interactivo">
-    <img id="imagen" class="w-full object-cover mb-4" alt="Ilustración de página" loading="lazy" />
-    <div id="texto" class="px-6 pb-6 text-lg leading-relaxed" tabindex="0"></div>
-    <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
-      <span id="progreso" class="text-sm bg-white px-2 py-1 rounded-full shadow">Página</span>
-    </div>
-    <button id="prev" class="absolute left-4 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-green-300" aria-label="Página anterior">◀</button>
-    <button id="next" class="absolute right-4 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-blue-300" aria-label="Página siguiente">▶</button>
+<body>
+  <h1>Mi Cuento de Aventuras</h1>
+  <div id="viewer">
+    <!-- Imágenes de página (.png) -->
+    <img id="page1"  src="images/page1.png"  alt="Página 1" />
+    <img id="page2"  src="images/page2.png"  alt="Página 2" />
+    <img id="page3"  src="images/page3.png"  alt="Página 3" />
+    <!-- … hasta la página 18 -->
+    <img id="page18" src="images/page18.png" alt="Página 18" />
   </div>
 
-  <!-- Hammer.js para gestos táctiles -->
-  <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
+  <div id="controls">
+    <button id="prev">Anterior</button>
+    <button id="next">Siguiente</button>
+  </div>
+
   <script>
-    let paginas = [];
-    let idx = 0;
-    const imgEl = document.getElementById('imagen');
-    const textoEl = document.getElementById('texto');
-    const progresoEl = document.getElementById('progreso');
+    // IDs de cada imagen/página
+    const pages = Array.from({ length: 18 }, (_, i) => `page${i+1}`);
+
+    // Siempre empezamos en la primera página (índice 0)
+    let currentIndex = 0;
+
     const prevBtn = document.getElementById('prev');
     const nextBtn = document.getElementById('next');
 
-    function actualizarControles() {
-      prevBtn.disabled = idx === 0;
-      nextBtn.disabled = idx === paginas.length - 1;
-      progresoEl.textContent = `Página ${idx+1} de ${paginas.length}`;
+    function showPage(index) {
+      pages.forEach((id, i) => {
+        const img = document.getElementById(id);
+        if (!img) return;
+        img.classList.toggle('active', i === index);
+      });
+      // Desactivar botones en los extremos
+      prevBtn.disabled = index === 0;
+      nextBtn.disabled = index === pages.length - 1;
     }
 
-    function mostrarPagina(i) {
-      idx = i;
-      imgEl.classList.add('flip-enter');
-      setTimeout(() => imgEl.classList.replace('flip-enter', 'flip-enter-active'), 0);
-      imgEl.src = `images/${i+1}.png`;
-      imgEl.onload = () => imgEl.classList.remove('flip-enter-active');
-
-      textoEl.textContent = paginas[i];
-      textoEl.focus();
-      actualizarControles();
-      localStorage.setItem('ultimaPagina', idx);
-
-      [i+1, i-1].forEach(j => {
-        if (j >= 0 && j < paginas.length) {
-          const img = new Image(); img.src = `images/${j+1}.png`;
-        }
-      });
-    }
-
-    fetch('texto/paginas.json')
-      .then(resp => resp.json())
-      .then(data => {
-        paginas = data;
-        idx = parseInt(localStorage.getItem('ultimaPagina')) || 0;
-        mostrarPagina(idx);
-      })
-      .catch(() => {
-        textoEl.textContent = 'Error al cargar el cuento.';
-      });
-
-    prevBtn.addEventListener('click', () => { if (idx > 0) mostrarPagina(idx - 1); });
-    nextBtn.addEventListener('click', () => { if (idx < paginas.length - 1) mostrarPagina(idx + 1); });
-
-    document.addEventListener('keydown', e => {
-      if (e.key === 'ArrowRight') nextBtn.click();
-      if (e.key === 'ArrowLeft') prevBtn.click();
+    // Event listeners para navegar
+    prevBtn.addEventListener('click', () => {
+      if (currentIndex > 0) {
+        currentIndex--;
+        showPage(currentIndex);
+      }
+    });
+    nextBtn.addEventListener('click', () => {
+      if (currentIndex < pages.length - 1) {
+        currentIndex++;
+        showPage(currentIndex);
+      }
     });
 
-    const hammer = new Hammer(document.getElementById('app'));
-    hammer.on('swipeleft', () => nextBtn.click());
-    hammer.on('swiperight', () => prevBtn.click());
-  </script>
-
-  <!-- Service Worker para PWA -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js');
-    }
+    // Al cargar la página, forzamos a mostrar siempre la página 1
+    window.addEventListener('DOMContentLoaded', () => {
+      currentIndex = 0;
+      showPage(currentIndex);
+    });
   </script>
 </body>
 </html>
