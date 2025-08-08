@@ -11,8 +11,15 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Kids+Play&display=swap');
     body { font-family: 'Kids Play', cursive; }
+    
+    /* Efecto de página */
     .flip-enter { transform: rotateY(-90deg); }
     .flip-enter-active { transform: rotateY(0deg); transition: transform 0.5s ease; }
+    .flip-leave { transform: rotateY(90deg); }
+    .flip-leave-active { transform: rotateY(0deg); transition: transform 0.5s ease; }
+
+    /* Efecto sonido de página */
+    audio { display: none; }
   </style>
 </head>
 <body class="bg-yellow-50 flex items-center justify-center min-h-screen p-4">
@@ -29,6 +36,9 @@
               class="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Página siguiente">▶</button>
     </div>
+
+    <!-- Audio de pasar página -->
+    <audio id="pageSound" src="page-turn.mp3"></audio>
   </div>
 
   <!-- Gestos táctiles -->
@@ -43,6 +53,7 @@
     const textoEl = document.getElementById('texto');
     const prevBtn = document.getElementById('prev');
     const nextBtn = document.getElementById('next');
+    const pageSound = document.getElementById('pageSound');  // Sonido de pasar página
 
     function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
 
@@ -76,11 +87,20 @@
         // si falla decode, continuamos de todas formas
       }
 
-      // Animación + swap de imagen
-      imgEl.classList.add('flip-enter');
-      requestAnimationFrame(() => imgEl.classList.replace('flip-enter', 'flip-enter-active'));
+      // Efecto de voltear la página
+      imgEl.classList.add('flip-leave');
+      requestAnimationFrame(() => imgEl.classList.replace('flip-leave', 'flip-leave-active'));
+      
+      // Sonido de pasar página
+      pageSound.play();
+
+      // Después de que la página "se voltee", cambia la imagen
       imgEl.src = src;
-      imgEl.onload = () => imgEl.classList.remove('flip-enter-active');
+      imgEl.onload = () => {
+        imgEl.classList.remove('flip-leave-active');
+        imgEl.classList.add('flip-enter');
+        requestAnimationFrame(() => imgEl.classList.replace('flip-enter', 'flip-enter-active'));
+      };
 
       // Texto y estado
       idx = target;
