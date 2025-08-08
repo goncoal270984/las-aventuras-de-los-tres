@@ -4,98 +4,134 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Las Aventuras de los Tres</title>
-  <!-- Manifest para PWA -->
+
   <link rel="manifest" href="manifest.json" />
-  <!-- Tailwind CSS desde CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Fuente personalizada y estilos de animación -->
+
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Kids+Play&display=swap');
     body { font-family: 'Kids Play', cursive; }
     .flip-enter { transform: rotateY(-90deg); }
-    .flip-enter-active { transform: rotateY(0deg); transition: transform 0.6s ease; }
-    .flip-exit { transform: rotateY(0deg); }
-    .flip-exit-active { transform: rotateY(90deg); transition: transform 0.6s ease; }
+    .flip-enter-active { transform: rotateY(0deg); transition: transform 0.5s ease; }
   </style>
 </head>
 <body class="bg-yellow-50 flex items-center justify-center min-h-screen p-4">
   <div id="app" class="w-full max-w-3xl bg-white shadow-xl rounded-2xl overflow-hidden relative">
     <img id="imagen" class="w-full object-cover mb-6" alt="Ilustración de página" loading="lazy" />
-    <div id="texto" class="px-8 py-6 text-lg leading-relaxed" tabindex="0"></div>
+    <div id="texto" class="px-8 pb-8 text-lg leading-relaxed" tabindex="0"></div>
 
-    <!-- Controles de navegación -->
-    <button id="prev"
-            class="absolute left-4 top-1/2 transform -translate-y-1/2 p-3 rounded-full bg-green-400"
-            aria-label="Página anterior">◀</button>
-    <button id="next"
-            class="absolute right-4 top-1/2 transform -translate-y-1/2 p-3 rounded-full bg-blue-400"
-            aria-label="Página siguiente">▶</button>
+    <!-- Controles -->
+    <div id="controls">
+      <button id="prev"
+              class="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-green-400 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Página anterior">◀</button>
+      <button id="next"
+              class="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Página siguiente">▶</button>
+    </div>
   </div>
 
-  <!-- Hammer.js para gestos táctiles -->
+  <!-- Gestos táctiles -->
   <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
   <script>
     let paginas = [];
-    let idx = 0; // siempre comienza en página 0
+    let idx = 0;                 // siempre arrancamos en página 0 (la 1 para el usuario)
+    let locked = false;          // bloquea navegación mientras carga/decodifica
+    let pendingIndex = null;     // última navegación solicitada mientras estaba bloqueado
 
     const imgEl   = document.getElementById('imagen');
     const textoEl = document.getElementById('texto');
     const prevBtn = document.getElementById('prev');
     const nextBtn = document.getElementById('next');
 
-    function actualizarControles() {
-      prevBtn.disabled = idx === 0;
-      nextBtn.disabled = idx === paginas.length - 1;
+    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+
+    function setDisabled(state) {
+      prevBtn.disabled = state || idx === 0;
+      nextBtn.disabled = state || idx === paginas.length - 1;
     }
 
-    function mostrarPagina(i) {
-      idx = i;
+    function preloadSrc(i) {
+      const p = new Image();
+      p.src = `images/${i+1}.png`;
+    }
+
+    // Carga la imagen de destino, espera a que decode() termine y luego la pinta
+    async function loadAndShow(target) {
+      locked = true;
+      setDisabled(true);
+
+      const src = `images/${target+1}.png`;
+      const pre = new Image();
+      pre.src = src;
+
+      try {
+        // decode() evita parpadeos y garantiza que la imagen esté lista
+        if ('decode' in pre) {
+          await pre.decode();
+        } else {
+          await new Promise((res, rej) => { pre.onload = res; pre.onerror = rej; });
+        }
+      } catch (_) {
+        // si falla decode, continuamos de todas formas
+      }
+
+      // Animación + swap de imagen
       imgEl.classList.add('flip-enter');
-      setTimeout(() => imgEl.classList.replace('flip-enter', 'flip-enter-active'), 0);
-      imgEl.src = `images/${i+1}.png`;
+      requestAnimationFrame(() => imgEl.classList.replace('flip-enter', 'flip-enter-active'));
+      imgEl.src = src;
       imgEl.onload = () => imgEl.classList.remove('flip-enter-active');
 
-      textoEl.textContent = paginas[i];
+      // Texto y estado
+      idx = target;
+      textoEl.textContent = paginas[idx];
       textoEl.focus();
-      actualizarControles();
 
-      // pre-carga de la siguiente/anterior
-      [i+1, i-1].forEach(j => {
-        if (j >= 0 && j < paginas.length) {
-          const img = new Image();
-          img.src = `images/${j+1}.png`;
-        }
-      });
+      // Preload de siguiente y anterior
+      if (idx + 1 < paginas.length) preloadSrc(idx + 1);
+      if (idx - 1 >= 0)            preloadSrc(idx - 1);
+
+      locked = false;
+      setDisabled(false);
+
+      // Si hubo una petición pendiente mientras cargábamos, la atendemos ahora
+      if (pendingIndex !== null && pendingIndex !== idx) {
+        const nextTarget = pendingIndex;
+        pendingIndex = null;
+        navigateTo(nextTarget);
+      }
     }
 
+    function navigate(delta) {
+      const target = clamp(idx + delta, 0, paginas.length - 1);
+      navigateTo(target);
+    }
+
+    function navigateTo(target) {
+      if (target === idx) return;
+      if (locked) { pendingIndex = target; return; }
+      loadAndShow(target);
+    }
+
+    // Carga del JSON y arranque SIEMPRE en la página 1
     fetch('texto/paginas.json')
-      .then(resp => resp.json())
-      .then(data => {
-        paginas = data;
-        mostrarPagina(0); // siempre arranca en la página 1
-      })
-      .catch(() => {
-        textoEl.textContent = 'Error al cargar el cuento.';
-      });
+      .then(r => r.json())
+      .then(data => { paginas = data; loadAndShow(0); })
+      .catch(() => { textoEl.textContent = 'Error al cargar el cuento.'; });
 
-    prevBtn.addEventListener('click', () => {
-      if (idx > 0) mostrarPagina(idx - 1);
-    });
-    nextBtn.addEventListener('click', () => {
-      if (idx < paginas.length - 1) mostrarPagina(idx + 1);
-    });
+    prevBtn.addEventListener('click', () => navigate(-1));
+    nextBtn.addEventListener('click', () => navigate(1));
 
-    document.addEventListener('keydown', e => {
-      if (e.key === 'ArrowRight') nextBtn.click();
-      if (e.key === 'ArrowLeft')  prevBtn.click();
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') navigate(1);
+      if (e.key === 'ArrowLeft')  navigate(-1);
     });
 
     const hammer = new Hammer(document.getElementById('app'));
-    hammer.on('swipeleft', () => nextBtn.click());
-    hammer.on('swiperight', () => prevBtn.click());
+    hammer.on('swipeleft',  () => navigate(1));
+    hammer.on('swiperight', () => navigate(-1));
   </script>
 
-  <!-- Service Worker para PWA -->
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js');
