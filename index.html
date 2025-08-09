@@ -13,34 +13,51 @@
     body { font-family: 'Kids Play', cursive; }
 
     /* Contenedor con perspectiva para efecto libro */
-    #book { perspective: 1400px; }
+    #book  { perspective: 1400px; }
     #sheet { will-change: transform; transform-style: preserve-3d; }
 
-    /* Animaciones de “pasar página” */
+    /* Animaciones del “pase de página” */
     .turn-out-next  { transform-origin: right center;  animation: turnOutNext 250ms ease forwards; }
     .turn-in-next   { transform-origin: right center;  animation: turnInNext  250ms ease forwards; }
     .turn-out-prev  { transform-origin: left  center;  animation: turnOutPrev 250ms ease forwards; }
     .turn-in-prev   { transform-origin: left  center;  animation: turnInPrev  250ms ease forwards; }
-
     @keyframes turnOutNext { to   { transform: rotateY(-90deg); } }
     @keyframes turnInNext  { from { transform: rotateY( 90deg); } to { transform: rotateY(0deg); } }
     @keyframes turnOutPrev { to   { transform: rotateY( 90deg); } }
     @keyframes turnInPrev  { from { transform: rotateY(-90deg); } to { transform: rotateY(0deg); } }
+
+    /* Mostrar/ocultar flechas SOLO sobre la imagen */
+    #imageWrap { position: relative; }
+    .image-controls {
+      opacity: 0; visibility: hidden; transition: opacity .2s ease;
+    }
+    /* En escritorio: al pasar el ratón por encima de la imagen */
+    .group:hover .image-controls {
+      opacity: 1; visibility: visible;
+    }
+    /* En móvil: clase que forzamos temporalmente con JS al tocar la imagen */
+    .show-controls .image-controls {
+      opacity: 1; visibility: visible;
+    }
   </style>
 </head>
 <body class="bg-yellow-50 flex items-center justify-center min-h-screen p-4">
   <div id="book" class="w-full max-w-3xl">
-    <div id="sheet" class="bg-white shadow-xl rounded-2xl overflow-hidden relative">
-      <img id="imagen" class="w-full object-cover mb-6" alt="Ilustración de página" loading="lazy" />
-      <div id="texto" class="px-8 pb-8 text-lg leading-relaxed" tabindex="0"></div>
+    <div id="sheet" class="bg-white shadow-xl rounded-2xl overflow-hidden">
+      
+      <!-- Imagen + flechas dentro (no pisan el texto) -->
+      <div id="imageWrap" class="group">
+        <img id="imagen" class="w-full object-cover" alt="Ilustración de página" loading="lazy" />
+        <button id="prev"
+                class="image-controls absolute left-3 top-1/2 -translate-y-1/2 p-3 rounded-full bg-green-500 text-white shadow"
+                aria-label="Página anterior">◀</button>
+        <button id="next"
+                class="image-controls absolute right-3 top-1/2 -translate-y-1/2 p-3 rounded-full bg-blue-600 text-white shadow"
+                aria-label="Página siguiente">▶</button>
+      </div>
 
-      <!-- Controles -->
-      <button id="prev"
-              class="absolute left-3 top-1/2 -translate-y-1/2 p-3 rounded-full bg-green-500 text-white shadow disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Página anterior">◀</button>
-      <button id="next"
-              class="absolute right-3 top-1/2 -translate-y-1/2 p-3 rounded-full bg-blue-600 text-white shadow disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Página siguiente">▶</button>
+      <!-- Texto con margen superior -->
+      <div id="texto" class="px-8 py-6 mt-2 text-lg leading-relaxed" tabindex="0"></div>
     </div>
   </div>
 
@@ -54,17 +71,20 @@
     let pendingIndex = null;     // Último destino solicitado durante el bloqueo
 
     // ====== Elementos ======
-    const sheet   = document.getElementById('sheet');
-    const imgEl   = document.getElementById('imagen');
-    const textoEl = document.getElementById('texto');
-    const prevBtn = document.getElementById('prev');
-    const nextBtn = document.getElementById('next');
+    const sheet     = document.getElementById('sheet');
+    const imgEl     = document.getElementById('imagen');
+    const textoEl   = document.getElementById('texto');
+    const prevBtn   = document.getElementById('prev');
+    const nextBtn   = document.getElementById('next');
+    const imageWrap = document.getElementById('imageWrap');
 
     // ====== Utilidades ======
     const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
     const setDisabled = (s) => {
       prevBtn.disabled = s || idx === 0;
       nextBtn.disabled = s || idx === paginas.length - 1;
+      prevBtn.classList.toggle('opacity-50', prevBtn.disabled);
+      nextBtn.classList.toggle('opacity-50', nextBtn.disabled);
     };
     const preloadSrc = (i) => { const p = new Image(); p.src = `images/${i+1}.png`; };
 
@@ -131,20 +151,17 @@
       .then(r => r.json())
       .then(data => {
         paginas = data;
-        // Inicializa contenido sin animación
-        imgEl.src = 'images/1.png';
+        imgEl.src = 'images/1.png';          // Inicializa sin animación
         textoEl.textContent = paginas[0];
         idx = 0;
         setDisabled(false);
-        // Preload primeros vecinos
         if (paginas.length > 1) preloadSrc(1);
       })
       .catch(() => { textoEl.textContent = 'Error al cargar el cuento.'; });
 
-    // Eventos
+    // Eventos de navegación
     prevBtn.addEventListener('click', () => navigate(-1));
     nextBtn.addEventListener('click', () => navigate(1));
-
     document.addEventListener('keydown', e => {
       if (e.key === 'ArrowRight') navigate(1);
       if (e.key === 'ArrowLeft')  navigate(-1);
@@ -153,6 +170,16 @@
     const hammer = new Hammer(document.getElementById('book'));
     hammer.on('swipeleft',  () => navigate(1));
     hammer.on('swiperight', () => navigate(-1));
+
+    // ====== Mostrar flechas en móvil al tocar la imagen ======
+    let hideTimer;
+    const showControls = (ms = 1500) => {
+      imageWrap.classList.add('show-controls');
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => imageWrap.classList.remove('show-controls'), ms);
+    };
+    imageWrap.addEventListener('touchstart', () => showControls());
+    imageWrap.addEventListener('mousemove',  () => showControls(1200)); // también útil en tablet/ratón
   </script>
 
   <script>
