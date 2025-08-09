@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Las Aventuras de los Tres</title>
 
   <link rel="manifest" href="manifest.json" />
@@ -11,143 +11,146 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Kids+Play&display=swap');
     body { font-family: 'Kids Play', cursive; }
-    
-    /* Efecto de página */
-    .flip-enter { transform: rotateY(-90deg); }
-    .flip-enter-active { transform: rotateY(0deg); transition: transform 0.5s ease; }
-    .flip-leave { transform: rotateY(90deg); }
-    .flip-leave-active { transform: rotateY(0deg); transition: transform 0.5s ease; }
 
-    /* Efecto sonido de página */
-    audio { display: none; }
+    /* Contenedor con perspectiva para efecto libro */
+    #book { perspective: 1400px; }
+    #sheet { will-change: transform; transform-style: preserve-3d; }
+
+    /* Animaciones de “pasar página” */
+    .turn-out-next  { transform-origin: right center;  animation: turnOutNext 250ms ease forwards; }
+    .turn-in-next   { transform-origin: right center;  animation: turnInNext  250ms ease forwards; }
+    .turn-out-prev  { transform-origin: left  center;  animation: turnOutPrev 250ms ease forwards; }
+    .turn-in-prev   { transform-origin: left  center;  animation: turnInPrev  250ms ease forwards; }
+
+    @keyframes turnOutNext { to   { transform: rotateY(-90deg); } }
+    @keyframes turnInNext  { from { transform: rotateY( 90deg); } to { transform: rotateY(0deg); } }
+    @keyframes turnOutPrev { to   { transform: rotateY( 90deg); } }
+    @keyframes turnInPrev  { from { transform: rotateY(-90deg); } to { transform: rotateY(0deg); } }
   </style>
 </head>
 <body class="bg-yellow-50 flex items-center justify-center min-h-screen p-4">
-  <div id="app" class="w-full max-w-3xl bg-white shadow-xl rounded-2xl overflow-hidden relative">
-    <img id="imagen" class="w-full object-cover mb-6" alt="Ilustración de página" loading="lazy" />
-    <div id="texto" class="px-8 pb-8 text-lg leading-relaxed" tabindex="0"></div>
+  <div id="book" class="w-full max-w-3xl">
+    <div id="sheet" class="bg-white shadow-xl rounded-2xl overflow-hidden relative">
+      <img id="imagen" class="w-full object-cover mb-6" alt="Ilustración de página" loading="lazy" />
+      <div id="texto" class="px-8 pb-8 text-lg leading-relaxed" tabindex="0"></div>
 
-    <!-- Controles -->
-    <div id="controls">
+      <!-- Controles -->
       <button id="prev"
-              class="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-green-400 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              class="absolute left-3 top-1/2 -translate-y-1/2 p-3 rounded-full bg-green-500 text-white shadow disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Página anterior">◀</button>
       <button id="next"
-              class="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              class="absolute right-3 top-1/2 -translate-y-1/2 p-3 rounded-full bg-blue-600 text-white shadow disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Página siguiente">▶</button>
     </div>
-
-    <!-- Audio de pasar página -->
-    <audio id="pageSound" src="page-turn.mp3"></audio>
   </div>
 
   <!-- Gestos táctiles -->
-  <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
   <script>
+    // ====== Estado ======
     let paginas = [];
-    let idx = 0;                 // siempre arrancamos en página 0 (la 1 para el usuario)
-    let locked = false;          // bloquea navegación mientras carga/decodifica
-    let pendingIndex = null;     // última navegación solicitada mientras estaba bloqueado
+    let idx = 0;                 // Siempre arranca en la página 0 (1 para el usuario)
+    let locked = false;          // Bloquea mientras animamos/cargamos
+    let pendingIndex = null;     // Último destino solicitado durante el bloqueo
 
+    // ====== Elementos ======
+    const sheet   = document.getElementById('sheet');
     const imgEl   = document.getElementById('imagen');
     const textoEl = document.getElementById('texto');
     const prevBtn = document.getElementById('prev');
     const nextBtn = document.getElementById('next');
-    const pageSound = document.getElementById('pageSound');  // Sonido de pasar página
 
-    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+    // ====== Utilidades ======
+    const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+    const setDisabled = (s) => {
+      prevBtn.disabled = s || idx === 0;
+      nextBtn.disabled = s || idx === paginas.length - 1;
+    };
+    const preloadSrc = (i) => { const p = new Image(); p.src = `images/${i+1}.png`; };
 
-    function setDisabled(state) {
-      prevBtn.disabled = state || idx === 0;
-      nextBtn.disabled = state || idx === paginas.length - 1;
-    }
+    // Carga imagen y hace swap a mitad de la animación
+    async function flipTo(target, dir) {
+      if (locked || target === idx) return;
 
-    function preloadSrc(i) {
-      const p = new Image();
-      p.src = `images/${i+1}.png`;
-    }
-
-    // Carga la imagen de destino, espera a que decode() termine y luego la pinta
-    async function loadAndShow(target) {
       locked = true;
       setDisabled(true);
 
+      const outClass = dir === 'next' ? 'turn-out-next' : 'turn-out-prev';
+      const inClass  = dir === 'next' ? 'turn-in-next'  : 'turn-in-prev';
+      const duration = 250; // ms por fase
+
+      // Fase 1: giro de salida
+      sheet.classList.remove('turn-in-next','turn-in-prev');
+      sheet.classList.add(outClass);
+
+      // Prepara siguiente imagen
       const src = `images/${target+1}.png`;
-      const pre = new Image();
-      pre.src = src;
+      const pre = new Image(); pre.src = src;
 
       try {
-        // decode() evita parpadeos y garantiza que la imagen esté lista
-        if ('decode' in pre) {
-          await pre.decode();
-        } else {
-          await new Promise((res, rej) => { pre.onload = res; pre.onerror = rej; });
-        }
-      } catch (_) {
-        // si falla decode, continuamos de todas formas
-      }
+        if ('decode' in pre) { await pre.decode(); }
+        else { await new Promise((res, rej) => { pre.onload = res; pre.onerror = rej; }); }
+      } catch (_) { /* sigue aunque decode falle */ }
 
-      // Efecto de voltear la página
-      imgEl.classList.add('flip-leave');
-      requestAnimationFrame(() => imgEl.classList.replace('flip-leave', 'flip-leave-active'));
-      
-      // Sonido de pasar página
-      pageSound.play();
-
-      // Después de que la página "se voltee", cambia la imagen
+      // En mitad del pase (tras la fase de salida), hacemos el swap
+      await new Promise(r => setTimeout(r, duration));
       imgEl.src = src;
-      imgEl.onload = () => {
-        imgEl.classList.remove('flip-leave-active');
-        imgEl.classList.add('flip-enter');
-        requestAnimationFrame(() => imgEl.classList.replace('flip-enter', 'flip-enter-active'));
-      };
-
-      // Texto y estado
+      textoEl.textContent = paginas[target];
       idx = target;
-      textoEl.textContent = paginas[idx];
-      textoEl.focus();
 
-      // Preload de siguiente y anterior
+      // Fase 2: giro de entrada
+      sheet.classList.remove(outClass);
+      sheet.classList.add(inClass);
+
+      // Fin de animación de entrada
+      await new Promise(r => setTimeout(r, duration));
+      sheet.classList.remove(inClass);
+
+      // Preload vecinos
       if (idx + 1 < paginas.length) preloadSrc(idx + 1);
-      if (idx - 1 >= 0)            preloadSrc(idx - 1);
+      if (idx - 1 >= 0)             preloadSrc(idx - 1);
 
       locked = false;
       setDisabled(false);
 
-      // Si hubo una petición pendiente mientras cargábamos, la atendemos ahora
+      // Atiende petición pendiente si existe
       if (pendingIndex !== null && pendingIndex !== idx) {
-        const nextTarget = pendingIndex;
-        pendingIndex = null;
-        navigateTo(nextTarget);
+        const nextTarget = pendingIndex; pendingIndex = null;
+        flipTo(nextTarget, nextTarget > idx ? 'next' : 'prev');
       }
     }
 
     function navigate(delta) {
       const target = clamp(idx + delta, 0, paginas.length - 1);
-      navigateTo(target);
-    }
-
-    function navigateTo(target) {
-      if (target === idx) return;
       if (locked) { pendingIndex = target; return; }
-      loadAndShow(target);
+      flipTo(target, delta > 0 ? 'next' : 'prev');
     }
 
-    // Carga del JSON y arranque SIEMPRE en la página 1
+    // ====== Arranque (siempre página 1) ======
     fetch('texto/paginas.json')
       .then(r => r.json())
-      .then(data => { paginas = data; loadAndShow(0); })
+      .then(data => {
+        paginas = data;
+        // Inicializa contenido sin animación
+        imgEl.src = 'images/1.png';
+        textoEl.textContent = paginas[0];
+        idx = 0;
+        setDisabled(false);
+        // Preload primeros vecinos
+        if (paginas.length > 1) preloadSrc(1);
+      })
       .catch(() => { textoEl.textContent = 'Error al cargar el cuento.'; });
 
+    // Eventos
     prevBtn.addEventListener('click', () => navigate(-1));
     nextBtn.addEventListener('click', () => navigate(1));
 
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', e => {
       if (e.key === 'ArrowRight') navigate(1);
       if (e.key === 'ArrowLeft')  navigate(-1);
     });
 
-    const hammer = new Hammer(document.getElementById('app'));
+    const hammer = new Hammer(document.getElementById('book'));
     hammer.on('swipeleft',  () => navigate(1));
     hammer.on('swiperight', () => navigate(-1));
   </script>
